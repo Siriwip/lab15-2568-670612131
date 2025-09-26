@@ -1,18 +1,20 @@
 import { Router, type Request, type Response } from "express";
 
 // import database
-import { students } from "../db/db.js";
+import { courses, students } from "../db/db.js";
 import {
+  zStudentId,
   zStudentDeleteBody,
   zStudentPostBody,
   zStudentPutBody,
-  zStudentId,
 } from "../schemas/studentValidator.js";
 import type { Student } from "../libs/types.js";
 
-const router = Router();
+const router: Router = Router();
 
-router.get("/students", (req: Request, res: Response) => {
+// GET /students
+// get students (by program)
+router.get("/", (req: Request, res: Response) => {
   try {
     const program = req.query.program;
 
@@ -39,13 +41,12 @@ router.get("/students", (req: Request, res: Response) => {
   }
 });
 
-/// GET /students/studentId
-
-router.get("/students/:studentId", (req: Request, res: Response) => {
+router.get("/:studentId", (req: Request, res: Response) => {
   try {
-    const studentId = req.params.studentId;
+    const studentId = req.params.sutdentId;
+    const result = zStudentId.safeParse(studentId);
 
-    const result = zStudentId.safeParse(studentId); 
+    // validate req.body with predefined validator
     if (!result.success) {
       return res.status(400).json({
         message: "Validation failed",
@@ -63,18 +64,72 @@ router.get("/students/:studentId", (req: Request, res: Response) => {
         success: false,
         message: "Student does not exists",
       });
-    }  
+    }
 
     // add response header 'Link'
     res.set("Link", `/students/${studentId}`);
 
     return res.json({
       success: true,
-      message: "Here is your student",
+      message: `Student ${studentId} founded`,
       data: students[foundIndex],
     });
   } catch (err) {
-    return res.status(500).json({
+    return res.json({
+      success: false,
+      message: "Somthing is wrong, please try again",
+      error: err,
+    });
+  }
+});
+
+//get studentId courses
+router.get("/:studentId/courses", (req: Request, res: Response) => {
+  try {
+    const studentId = req.params.studentId;
+    const result = zStudentId.safeParse(studentId);
+
+    if (!result.success) {
+      return res.status(400).json({
+        check: studentId,
+        message: "Validation failed",
+        errors: result.error.issues[0]?.message,
+      });
+    }
+
+    //check duplicate studentId
+    const foundIndex = students.findIndex(
+      (student) => student.studentId === studentId
+    );
+
+    if (foundIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Student does not exists",
+      });
+    }
+
+    // add response header 'Link'
+    res.set("Link", `/api/v2/students/${studentId}/courses`);
+
+    const respondcourse = students[foundIndex]?.courses?.map((course) => {
+        const enrolledcourse = courses.find((e) => e.courseId == course);
+        return {
+            courseId: enrolledcourse?.courseId,
+            courseTitle: enrolledcourse?.courseTitle
+        }
+    })
+
+    return res.json({
+      success: true,
+      message: `Get courses detail of student ${studentId}`,
+      data: {
+        studentId: studentId,
+        courses: respondcourse
+      }
+    });
+  } catch (err) {
+    return res.json({
       success: false,
       message: "Somthing is wrong, please try again",
       error: err,
@@ -84,12 +139,12 @@ router.get("/students/:studentId", (req: Request, res: Response) => {
 
 // POST /students, body = {new student data}
 // add a new student
-router.post("/students", (req: Request, res: Response) => {
+router.post("/", (req: Request, res: Response) => {
   try {
     const body = req.body as Student;
 
     // validate req.body with predefined validator
-    const result = zStudentPostBody.safeParse(body); 
+    const result = zStudentPostBody.safeParse(body);
     if (!result.success) {
       return res.json({
         message: "Validation failed",
@@ -131,7 +186,7 @@ router.post("/students", (req: Request, res: Response) => {
 
 // PUT /students, body = {studentId}
 // Update specified student
-router.put("/students", (req: Request, res: Response) => {
+router.put("/", (req: Request, res: Response) => {
   try {
     const body = req.body as Student;
 
@@ -177,7 +232,7 @@ router.put("/students", (req: Request, res: Response) => {
 });
 
 // DELETE /students, body = {studentId}
-router.delete("/students", (req: Request, res: Response) => {
+router.delete("/", (req: Request, res: Response) => {
   try {
     const body = req.body;
     const parseResult = zStudentDeleteBody.safeParse(body);
@@ -217,4 +272,4 @@ router.delete("/students", (req: Request, res: Response) => {
   }
 });
 
-export default router
+export default router;
